@@ -1,6 +1,6 @@
 {
   "name": "furry-cactus",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "scripts to take swarm information and distribute it to other services",
   "main": "index.js",
   "scripts": {
