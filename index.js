@@ -80,7 +80,7 @@ Promise.props({
   docks: getDocks(),
   swarmHosts: getSwarmInfo()
 })
-  .then((data) => {
+  .tap((data) => {
     return Promise.each(data.swarmHosts, (h) => {
       const d = find(data.docks, (dock) => {
         return dock.PrivateIpAddress === h.Host
@@ -95,46 +95,129 @@ Promise.props({
         return
       }
       const orgID = org.Value
-      const postData = {
-        Namespace: 'Runnable/Swarm',
-        MetricData: [
-          {
-            MetricName: 'Swarm Reserved Memory',
-            Dimensions: [{
-              Name: 'InstanceId',
-              Value: d.InstanceId
-            }, {
-              Name: 'AutoScalingGroupName',
-              Value: `asg-production-${ENVIRONMENT}-${orgID}`
-            }],
-            Value: h.Value,
-            Unit: h.Unit
-          }, {
-            MetricName: 'Swarm Reserved Memory',
-            Dimensions: [{
-              Name: 'AutoScalingGroupName',
-              Value: `asg-production-${ENVIRONMENT}-${orgID}`
-            }],
-            Value: h.Value,
-            Unit: h.Unit
-          }
-        ]
-      }
-      console.log(JSON.stringify(postData))
-      return Promise.fromCallback((cb) => {
-        if (DRY_RUN) {
-          console.log('dry run. would be putting data')
-          return cb()
-        }
-        cloudwatch.putMetricData(postData, cb)
-      })
-        .then(() => { console.log('posted') })
+      return sendToCloudWatch(orgID, h, d)
     })
   })
+  .then(sendThresholdDataToCloudWatch)
   .catch((err) => {
     console.log(err.stack || err.message || err)
     process.exit(1)
   })
+
+function sendThresholdDataToCloudWatch (data) {
+  const orgInfo = data.swarmHosts.reduce((memo, curr) => {
+    if (memo[curr.org]) {
+      memo[curr.org].available += curr.availableMemoryGiB
+      memo[curr.org].used += curr.usedMemoryGiB
+      memo[curr.org].singleDockCapacity =
+        Math.max(curr.availableMemoryGiB, memo[curr.org].singleDockCapacity)
+    } else {
+      memo[curr.org] = {
+        available: curr.availableMemoryGiB,
+        used: curr.usedMemoryGiB,
+        singleDockCapacity: curr.availableMemoryGiB
+      }
+    }
+    return memo
+  }, {})
+  return Promise.each(Object.keys(orgInfo), (key) => {
+    const orgData = orgInfo[key]
+    const orgID = key
+    const threshold = orgData.available *
+      (1 -
+        (orgData.singleDockCapacity /
+        (orgData.available + orgData.singleDockCapacity))
+      )
+    const thresholdUsage = orgData.used / threshold * 100
+    const postData = {
+      Namespace: 'Runnable/Swarm',
+      MetricData: [
+        {
+          MetricName: 'Swarm Reserved Memory Threshold',
+          Dimensions: [{
+            Name: 'AutoScalingGroupName',
+            Value: `asg-production-${ENVIRONMENT}-${orgID}`
+          }],
+          Value: threshold,
+          Unit: 'Gigabytes'
+        },
+        {
+          MetricName: 'Swarm Reserved Memory Threshold Usage',
+          Dimensions: [{
+            Name: 'AutoScalingGroupName',
+            Value: `asg-production-${ENVIRONMENT}-${orgID}`
+          }],
+          Value: thresholdUsage,
+          Unit: 'Percent'
+        },
+        {
+          MetricName: 'Swarm Reserved Memory Total',
+          Dimensions: [{
+            Name: 'AutoScalingGroupName',
+            Value: `asg-production-${ENVIRONMENT}-${orgID}`
+          }],
+          Value: orgData.available,
+          Unit: 'Gigabytes'
+        },
+        {
+          MetricName: 'Swarm Reserved Memory Used',
+          Dimensions: [{
+            Name: 'AutoScalingGroupName',
+            Value: `asg-production-${ENVIRONMENT}-${orgID}`
+          }],
+          Value: orgData.used,
+          Unit: 'Gigabytes'
+        }
+      ]
+    }
+    console.log(JSON.stringify(postData))
+    return Promise.fromCallback((cb) => {
+      if (DRY_RUN) {
+        console.log('dry run. would be putting data')
+        return cb()
+      }
+      cloudwatch.putMetricData(postData, cb)
+    })
+  })
+}
+
+function sendToCloudWatch (orgID, swarmHostInfo, awsDockInfo) {
+  return Promise.try(() => {
+    const postData = {
+      Namespace: 'Runnable/Swarm',
+      MetricData: [
+        {
+          MetricName: 'Swarm Reserved Memory',
+          Dimensions: [{
+            Name: 'InstanceId',
+            Value: awsDockInfo.InstanceId
+          }, {
+            Name: 'AutoScalingGroupName',
+            Value: `asg-production-${ENVIRONMENT}-${orgID}`
+          }],
+          Value: swarmHostInfo.Value,
+          Unit: swarmHostInfo.Unit
+        }, {
+          MetricName: 'Swarm Reserved Memory',
+          Dimensions: [{
+            Name: 'AutoScalingGroupName',
+            Value: `asg-production-${ENVIRONMENT}-${orgID}`
+          }],
+          Value: swarmHostInfo.Value,
+          Unit: swarmHostInfo.Unit
+        }
+      ]
+    }
+    console.log(JSON.stringify(postData))
+    return Promise.fromCallback((cb) => {
+      if (DRY_RUN) {
+        console.log('dry run. would be putting data')
+        return cb()
+      }
+      cloudwatch.putMetricData(postData, cb)
+    })
+  })
+}
 
 function getDocks () {
   return Promise.resolve({ instances: [] })
@@ -183,7 +266,10 @@ function getSwarmInfo () {
         return {
           Host: node.Host.split(':').shift(),
           Value: percentage,
-          Unit: 'Percent'
+          Unit: 'Percent',
+          org: node.Labels.org,
+          usedMemoryGiB: usedMemoryGiB,
+          availableMemoryGiB: availableMemoryGiB
         }
       })
     })
