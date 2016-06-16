@@ -32,6 +32,14 @@ describe('Swarm Model', () => {
         })
     })
 
+    it('should return the decorate the host with the org', () => {
+      return assert.isFulfilled(swarm.getInfo())
+        .then((data) => {
+          assert.equal(data[0].org, '1000')
+          assert.equal(data[1].org, '2000')
+        })
+    })
+
     it('should return the percentage used for each host', () => {
       return assert.isFulfilled(swarm.getInfo())
         .then((data) => {
