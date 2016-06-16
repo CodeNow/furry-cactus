@@ -16,6 +16,4 @@ for (var i = 0; i < SWARM_INFO.SystemStatus.length; ++i) {
   }
 }
 
-console.log(SWARM_INFO)
-
 module.exports = SWARM_INFO
