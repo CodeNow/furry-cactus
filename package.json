@@ -37,7 +37,7 @@
     "aws-sdk": "^2.3.6",
     "bluebird": "^3.3.5",
     "dockerode": "^2.2.10",
-    "swarmerode": "^2.1.0"
+    "swarmerode": "^3.0.0"
   },
   "devDependencies": {
     "chai": "^3.5.0",
