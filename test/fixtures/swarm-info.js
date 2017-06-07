@@ -8,7 +8,7 @@ const SWARM_INFO = swarmInfoGenerator([{
   Labels: 'org=2000'
 }])
 
-const reservedMemoryRegexp = /Reserved\ Memory/
+const reservedMemoryRegexp = /Reserved Memory/
 
 for (var i = 0; i < SWARM_INFO.SystemStatus.length; ++i) {
   if (reservedMemoryRegexp.test(SWARM_INFO.SystemStatus[i][0])) {
