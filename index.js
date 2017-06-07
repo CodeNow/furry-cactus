@@ -7,7 +7,6 @@ const Swarm = require('./lib/swarm')
 const logger = require('./loggers').child({ module: 'models/main' })
 const log = logger.child({ method: 'main' })
 
-
 const swarm = new Swarm()
 
 log.info('Start')
