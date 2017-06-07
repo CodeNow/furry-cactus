@@ -4,7 +4,7 @@ const Promise = require('bluebird')
 
 const AWS = require('./lib/aws')
 const Swarm = require('./lib/swarm')
-const logger = require('./loggers').child({ module: 'models/main' })
+const logger = require('./lib/loggers').child({ module: 'models/main' })
 const log = logger.child({ method: 'main' })
 
 const swarm = new Swarm()
