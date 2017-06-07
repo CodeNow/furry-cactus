@@ -21,6 +21,7 @@ Promise.props({
   .tap(data => log.trace({ data }, 'Done sending threshold data to cloudwatch'))
   .tap(data => (AWS.sendMaximumAvailableToCloudWatch(data.swarmHosts)))
   .tap(data => log.trace({ data }, 'Done sending max available to cloudwatch'))
+  .tap(() => log.info('Finished Succsefully'))
   .catch((err) => {
     log.error({ err }, 'Error running script')
     process.exit(1)
